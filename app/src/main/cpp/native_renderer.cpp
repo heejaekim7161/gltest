@@ -6,6 +6,7 @@
 Renderer::Renderer(AAssetManager* asset_manager, std::string file_dir) {
   asset_manager_ = asset_manager;
   file_dir_ = file_dir;
+  camera_ = new Camera(glm::tvec3<float, glm::highp>(0.0f, 0.0f, 4.0f));
 }
 
 Renderer::~Renderer() {
@@ -64,7 +65,7 @@ GLuint Renderer::CompileShader(std::string shader_file, GLenum type) {
   glGetShaderiv(shader_id, GL_COMPILE_STATUS, &result);
   glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &log_len);
   if (result == 0) {
-    LOGE("CompileShader: fail to compile");
+    LOGE("CompileShader: fail to compile: %s", shader_file.c_str());
     std::vector<char> msg(log_len + 1);
     glGetShaderInfoLog(shader_id, log_len, NULL, &msg[0]);
     LOGE("%s", &msg[0]);
@@ -74,40 +75,100 @@ GLuint Renderer::CompileShader(std::string shader_file, GLenum type) {
 }
 
 void Renderer::CreateProgram() {
-  GLuint vertex_shader = CompileShader(VERTEX_SHADER, GL_VERTEX_SHADER);
-  GLuint fragment_shader = CompileShader(FRAGMENT_SHADER, GL_FRAGMENT_SHADER);
+  GLuint cube_vertex = CompileShader("cube_vertex.shader", GL_VERTEX_SHADER);
+  GLuint cube_fragment = CompileShader("cube_fragment.shader", GL_FRAGMENT_SHADER);
 
-  program_ = glCreateProgram();
-  glAttachShader(program_, vertex_shader);
-  glAttachShader(program_, fragment_shader);
-  glLinkProgram (program_);
-  glUseProgram(program_);
+  cube_program_ = glCreateProgram();
+  glAttachShader(cube_program_, cube_vertex);
+  glAttachShader(cube_program_, cube_fragment);
+  glLinkProgram (cube_program_);
+  glUseProgram(cube_program_);
 
-  a_position_ = glGetAttribLocation(program_, "a_Position");
-  glEnableVertexAttribArray (a_position_);
-  glVertexAttribPointer(a_position_, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
-                        0);
-  a_color_ = glGetAttribLocation(program_, "a_Color");
-  glEnableVertexAttribArray (a_color_);
-  glVertexAttribPointer(a_color_, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
-                        (void*) (2 * sizeof(GLfloat)));
+  u_cube_model_ = glGetUniformLocation(cube_program_, "model");
+  u_cube_view_ = glGetUniformLocation(cube_program_, "view");
+  u_cube_projection_ = glGetUniformLocation(cube_program_, "projection");
+  u_cube_object_color_ = glGetUniformLocation(cube_program_, "objectColor");
+  u_cube_light_color_ = glGetUniformLocation(cube_program_, "lightColor");
+  u_cube_light_pos_ = glGetUniformLocation(cube_program_, "lightPos");
+  u_cube_view_pos_ = glGetUniformLocation(cube_program_, "viewPos");
+
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat),
+                        (void*) 0);
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat),
+                        (void*) (3 * sizeof(GLfloat)));
+
+  GLuint light_vertex = CompileShader("light_vertex.shader", GL_VERTEX_SHADER);
+  GLuint light_fragment = CompileShader("light_fragment.shader",
+                                        GL_FRAGMENT_SHADER);
+  light_program_ = glCreateProgram();
+  glAttachShader(light_program_, light_vertex);
+  glAttachShader(light_program_, light_fragment);
+  glLinkProgram (light_program_);
+  glUseProgram(light_program_);
+
+  u_light_model_ = glGetUniformLocation(light_program_, "model");
+  u_light_view_ = glGetUniformLocation(light_program_, "view");
+  u_light_projection_ = glGetUniformLocation(light_program_, "projection");
+
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat),
+                        (void*) 0);
 }
 
 void Renderer::Initialize() {
+  glEnable (GL_DEPTH_TEST);
   glGenBuffers(1, &vertex_buffer_);
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
   glBufferData(GL_ARRAY_BUFFER, sizeof(VERTICES), VERTICES, GL_STATIC_DRAW);
-
-  glGenBuffers(1, &index_buffer_);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(INDICES), INDICES,
-               GL_STATIC_DRAW);
-
   CreateProgram();
   CheckGlError("Initialize");
+
+  LOGD("glsl version = %s", glGetString(GL_SHADING_LANGUAGE_VERSION));
+}
+
+void Renderer::OnSurfaceChanged(int width, int height) {
+  width_ = width;
+  height_ = height;
 }
 
 void Renderer::Draw() {
-  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-  CheckGlError("Draw");
+  glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  glUseProgram (cube_program_);
+  glUniform3f(u_cube_object_color_, 1.0f, 0.5f, 0.31f);
+  glUniform3f(u_cube_light_color_, 1.0f, 1.0f, 1.0f);
+  glUniform3fv(u_cube_light_pos_, 1, glm::value_ptr(light_pos_));
+  glUniform3fv(u_cube_view_pos_, 1, glm::value_ptr(camera_->Position));
+
+  glm::mat4 projection = glm::perspective(glm::radians(camera_->Zoom),
+                                          (float) width_ / (float) height_,
+                                          0.1f, 100.0f);
+  glm::mat4 view = camera_->GetViewMatrix();
+  glUniformMatrix4fv(u_cube_projection_, 1, GL_FALSE,
+                     glm::value_ptr(projection));
+  glUniformMatrix4fv(u_cube_view_, 1, GL_FALSE, glm::value_ptr(view));
+  glm::mat4 model = glm::mat4();
+  model = glm::translate(model, glm::vec3(0.0f, -0.5f, -4.0f));
+  model = glm::rotate(model, glm::radians(30.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+  model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  model = glm::scale(model, glm::vec3(1.5f));
+  glUniformMatrix4fv(u_cube_model_, 1, GL_FALSE, glm::value_ptr(model));
+
+  glDrawArrays(GL_TRIANGLES, 0, 36);
+  CheckGlError("Draw: cube");
+
+  glUseProgram (light_program_);
+  glUniformMatrix4fv(u_light_projection_, 1, GL_FALSE,
+                     glm::value_ptr(projection));
+  glUniformMatrix4fv(u_light_view_, 1, GL_FALSE, glm::value_ptr(view));
+  model = glm::mat4();
+  model = glm::translate(model, light_pos_);
+  model = glm::scale(model, glm::vec3(0.1f));
+  glUniformMatrix4fv(u_light_model_, 1, GL_FALSE, glm::value_ptr(model));
+
+  glDrawArrays(GL_TRIANGLES, 0, 36);
+  CheckGlError("Draw: light");
 }

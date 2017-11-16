@@ -1,11 +1,11 @@
-#include "test_com_gltest_Renderer.h"
+#include "test_opengl_Renderer.h"
 
 #include <android/asset_manager_jni.h>
 #include "native_renderer.h"
 
 extern "C"
 
-JNIEXPORT jlong JNICALL Java_test_com_gltest_Renderer_nativeInit
+JNIEXPORT jlong JNICALL Java_test_opengl_Renderer_nativeInit
 (JNIEnv* env, jobject obj, jobject jasset_manager, jstring jfile_dir) {
   const char* file_dir = env->GetStringUTFChars(jfile_dir, NULL);
   Renderer* renderer = new Renderer(
@@ -14,7 +14,7 @@ JNIEXPORT jlong JNICALL Java_test_com_gltest_Renderer_nativeInit
   return (long)renderer;
 }
 
-JNIEXPORT void JNICALL Java_test_com_gltest_Renderer_nativeOnSurfaceCreated
+JNIEXPORT void JNICALL Java_test_opengl_Renderer_nativeOnSurfaceCreated
 (JNIEnv* env, jobject obj, jlong ptr) {
   if (ptr) {
     Renderer* renderer = (Renderer*) ptr;
@@ -22,7 +22,15 @@ JNIEXPORT void JNICALL Java_test_com_gltest_Renderer_nativeOnSurfaceCreated
   }
 }
 
-JNIEXPORT void JNICALL Java_test_com_gltest_Renderer_nativeDraw
+JNIEXPORT void JNICALL Java_test_opengl_Renderer_nativeOnSurfaceChanged
+(JNIEnv* env, jobject obj, jlong ptr, jint width, jint height) {
+  if (ptr) {
+    Renderer* renderer = (Renderer*) ptr;
+    renderer->OnSurfaceChanged(width, height);
+  }
+}
+
+JNIEXPORT void JNICALL Java_test_opengl_Renderer_nativeDraw
 (JNIEnv* env, jobject obj, jlong ptr) {
   if (ptr) {
     Renderer* renderer = (Renderer*) ptr;

@@ -10,6 +10,8 @@ cmake_minimum_required(VERSION 3.4.1)
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
+include (src/main/cpp/glm/CMakeLists.txt)
+
 add_library( # Sets the name of the library.
              native-lib
 
@@ -44,5 +46,6 @@ target_link_libraries( # Specifies the target library.
                        ${log-lib}
                        android
                        EGL
-                       GLESv2
+                       # GLESv2
+                       GLESv3
                        )
