@@ -1,7 +1,6 @@
 #include "native_renderer.h"
 #include <iostream>
 #include <fstream>
-#include <vector>
 
 Renderer::Renderer(AAssetManager* asset_manager, std::string file_dir) {
   asset_manager_ = asset_manager;
@@ -44,7 +43,7 @@ void Renderer::ExtractShaderSource(std::string name, std::string& source) {
   if (stream.is_open()) {
     std::string line = "";
     while (getline(stream, line)) {
-      source += "\n" + line;
+      source += line + "\n";
     }
     stream.close();
   } else
